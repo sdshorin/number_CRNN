@@ -1,0 +1,5 @@
+data/*
+raw_data/*
+raw_images/*
+raw_duplicates/*
+.DS_Store
