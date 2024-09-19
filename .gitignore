@@ -6,9 +6,9 @@ raw_duplicates/*
 results/*
 results/.DS_Store
 __pycache__/*
-results/.DS_Store
+results/*
 scripts.sh
 
-number_crnn/article_utils/__pycache__/*
+article_utils/__pycache__/*
 images/*
 
