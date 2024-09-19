@@ -3,3 +3,12 @@ raw_data/*
 raw_images/*
 raw_duplicates/*
 .DS_Store
+results/*
+results/.DS_Store
+__pycache__/*
+results/.DS_Store
+scripts.sh
+
+number_crnn/article_utils/__pycache__/*
+images/*
+
