@@ -8,18 +8,15 @@ from torch.utils.data import DataLoader
 from functools import partial
 import random
 
+from config import get_custom_dataset_folder
+
 # Constants
 TEST_DATASET_SIZE = 1000
 BATCH_SIZE = 32
-SEED = 46 + 89
 
-random.seed(SEED)
-torch.manual_seed(SEED)
 
 from tokenizer import Tokenizer
 
-alphabet = "0123456789"
-tokenizer = Tokenizer(alphabet)
 
 def collate_fn(batch, tokenizer):
     data = [item[0] for item in batch]
@@ -28,15 +25,15 @@ def collate_fn(batch, tokenizer):
     labels_encoded = tokenizer.encode(labels)
     return data, labels_encoded
 
-def load_data(batch_size=64):
+def load_data(tokenizer, seed, batch_size=64):
     mnist_test = MNIST(root='./data', train=False, download=True)
     test_dataset = HandwrittenNumbersDataset(
-        custom_dataset_folder='/Users/sergejsorin/work/math/lib/mnist_improve/local_data/sorted',
+        custom_dataset_folder=get_custom_dataset_folder(),
         mnist_dataset=mnist_test,
         max_digits=5,
         length=TEST_DATASET_SIZE,
         include_leading_zeros=False,
-        seed=SEED,
+        seed=seed,
         pre_generate=True,
         num_threads=1
     )
@@ -45,7 +42,7 @@ def load_data(batch_size=64):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=collate_fn_with_tokenizer)
     return test_loader
 
-def evaluate_onnx_model(model_path, test_loader):
+def evaluate_onnx_model(tokenizer, model_path, test_loader):
     session = onnxruntime.InferenceSession(model_path)
     correct_samples = []
     incorrect_samples = []
@@ -74,7 +71,7 @@ def evaluate_onnx_model(model_path, test_loader):
     return correct_samples, incorrect_samples
 
 def plot_samples(correct_samples, incorrect_samples, output_path):
-    plt.rcParams['font.family'] = 'DejaVu Sans'  # или другой шрифт с поддержкой кириллицы
+    plt.rcParams['font.family'] = 'DejaVu Sans'
     fig, axs = plt.subplots(4, 3, figsize=(15, 10))
     fig.suptitle("Примеры работы модели OptimizedCRNN после квантизации", fontsize=16)
 
@@ -101,13 +98,18 @@ def plot_samples(correct_samples, incorrect_samples, output_path):
     plt.close()
 
 def main():
+    SEED = 87
+    random.seed(SEED)
+    torch.manual_seed(SEED)
+    alphabet = "0123456789"
+    tokenizer = Tokenizer(alphabet)
     model_path = "results/model_1_middle/crnn_model_quantized.onnx"
-    test_loader = load_data()
+    test_loader = load_data(tokenizer, SEED)
     
-    correct_samples, incorrect_samples = evaluate_onnx_model(model_path, test_loader)
+    correct_samples, incorrect_samples = evaluate_onnx_model(tokenizer, model_path, test_loader)
     
-    plot_samples(correct_samples, incorrect_samples, '../final_paper/images/model_evaluation_results.png')
-    print(f"Результаты сохранены в '../final_paper/images/model_evaluation_results.png'")
+    plot_samples(correct_samples, incorrect_samples, './images/model_evaluation_results.png')
+    print(f"Результаты сохранены в './images/model_evaluation_results.png'")
 
 if __name__ == "__main__":
     main()

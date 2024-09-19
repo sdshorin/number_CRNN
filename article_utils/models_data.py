@@ -345,5 +345,6 @@ model_logs = [
     ("Model middle", model2_log),
     ("Model small", model3_log)
 ]
-
-compare_models(model_logs)
+if __name__ == "__main__":
+    
+    compare_models(model_logs)

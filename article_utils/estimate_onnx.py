@@ -7,22 +7,14 @@ from torch.utils.data import DataLoader
 from functools import partial
 import random
 import json
-
+from config import get_custom_dataset_folder
 # Constants
 TEST_DATASET_SIZE = 1000
 BATCH_SIZE = 32
 
-CTC_BLANK = '<BLANK>'
-OOV_TOKEN = '<OOV>'
 
-seed = 46 + 88
-random.seed(seed)
-torch.manual_seed(seed)
 
 from tokenizer import Tokenizer
-
-alphabet = "0123456789"
-tokenizer = Tokenizer(alphabet)
 
 def collate_fn(batch, tokenizer):
     data = [item[0] for item in batch]
@@ -32,11 +24,11 @@ def collate_fn(batch, tokenizer):
     return data, labels_encoded
 
 
-def load_data(batch_size=64):
+def load_data(tokenizer, seed, batch_size=64):
         
     mnist_test = MNIST(root='./data', train=False, download=True)
     test_dataset = HandwrittenNumbersDataset(
-        custom_dataset_folder='/Users/sergejsorin/work/math/lib/mnist_improve/local_data/sorted',
+        custom_dataset_folder=get_custom_dataset_folder(),
         mnist_dataset=mnist_test,
         max_digits=5,
         length=TEST_DATASET_SIZE,
@@ -53,7 +45,7 @@ def load_data(batch_size=64):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0, collate_fn=collate_fn_with_tokenizer)
     return test_loader
 
-def evaluate_onnx_model(model_path, test_loader):
+def evaluate_onnx_model(tokenizer, model_path, test_loader):
     session = onnxruntime.InferenceSession(model_path)
     correct = 0
     total = 0
@@ -85,19 +77,26 @@ def evaluate_onnx_model(model_path, test_loader):
 
 # Основная функция
 def main():
-    test_loader = load_data()
+    seed = 48
+    random.seed(seed)
+    torch.manual_seed(seed)
+
+    alphabet = "0123456789"
+    tokenizer = Tokenizer(alphabet)
+
+    test_loader = load_data(tokenizer, seed)
     
     model_paths = [
-        "results/model_1_big/crnn_model_quantized.onnx",
-        "results/model_1_middle/crnn_model_quantized.onnx",
-        "results/model_1_small/crnn_model_quantized.onnx",
-        "results/model_1_big/crnn_model.onnx",
-        "results/model_1_middle/crnn_model.onnx",
-        "results/model_1_small/crnn_model.onnx",
+        "models/crnn_OptimizedCRNN.onnx",
+        "models/crnn_OptimizedCRNN_quantized.onnx",
+        "models/crnn_SmallCRNN.onnx",
+        "models/crnn_SmallCRNN_quantized.onnx",
+        "models/crnn_OriginalCRNN.onnx",
+        "models/crnn_OriginalCRNN_quantized.onnx",
     ]
 
     for i, model_path in enumerate(model_paths, 1):
-        accuracy = evaluate_onnx_model(model_path, test_loader)
+        accuracy = evaluate_onnx_model(tokenizer, model_path, test_loader)
         print(f"Model {i} Accuracy: {accuracy:.4f}, Model Path: {model_path}")
 
 if __name__ == "__main__":
