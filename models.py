@@ -118,7 +118,7 @@ class OptimizedCRNN(nn.Module):
 
         self.cnn = cnn
         self.rnn = nn.Sequential(
-            BidirectionalLSTM(nm[-1], nh, nclass))  # Уменьшено количество рекуррентных слоёв
+            BidirectionalLSTM(nm[-1], nh, nclass))
 
     def forward(self, input):
         conv = self.cnn(input)
@@ -165,7 +165,6 @@ class SmallCRNN(nn.Module):
         self.cnn = cnn
         self.nclass = nclass
 
-        # Since h=2, nIn becomes c * h
         nIn = nm[-1] * 2  # c * h
         self.rnn = nn.Sequential(
             BidirectionalLSTM(nIn=nIn, nHidden=nh, nOut=nh),

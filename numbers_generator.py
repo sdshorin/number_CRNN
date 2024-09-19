@@ -8,6 +8,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 import time
 import matplotlib.pyplot as plt
+from config import get_custom_dataset_folder
 
 class HandwrittenNumbersDataset(Dataset):
     digits_per_class = 1000
@@ -22,15 +23,13 @@ class HandwrittenNumbersDataset(Dataset):
         self.num_threads = num_threads
         self.length = length
 
-        # Load digit images
         self.digit_images = self.load_digit_images()
 
-        # Set seed for reproducibility
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
 
-        # Pre-generate data if required
+
         if self.pre_generate:
             start_time = time.time()
             self.data = []
@@ -39,11 +38,10 @@ class HandwrittenNumbersDataset(Dataset):
             print(f"Data generation time: {end_time - start_time:.2f} seconds")
 
     def load_digit_images(self):
-        # Load images from custom dataset and MNIST
+
         digit_images = {str(i): [] for i in range(10)}
         custom_counts = {}
 
-        # Load custom dataset images
         for digit in range(10):
             folder_path = os.path.join(self.custom_dataset_folder, str(digit))
             if os.path.exists(folder_path):
@@ -51,8 +49,7 @@ class HandwrittenNumbersDataset(Dataset):
                 for img_file in os.listdir(folder_path):
                     if img_file.endswith('.png'):
                         img_path = os.path.join(folder_path, img_file)
-                        image = Image.open(img_path).convert('L')  # Grayscale
-                        # Invert image if necessary
+                        image = Image.open(img_path).convert('L') 
                         if np.mean(image) > 127:
                             image = ImageOps.invert(image)
                         images.append(image)
@@ -68,7 +65,6 @@ class HandwrittenNumbersDataset(Dataset):
         for img, label in self.mnist_dataset:
             label_str = str(label)
             if mnist_digit_counts[label_str] < self.digits_per_class - custom_counts[label_str]:
-                # Invert MNIST images if necessary
                 if np.mean(img) > 127:
                     img = ImageOps.invert(img)
                 mnist_digit_images[label_str].append(img)
@@ -92,7 +88,6 @@ class HandwrittenNumbersDataset(Dataset):
             return self.generate_sample()
 
     def generate_sample(self):
-        # Generate a random number
         num_digits = random.randint(1, self.max_digits)
         if self.include_leading_zeros and random.random() < 0.1:
             # 10% chance to include leading zeros
@@ -112,16 +107,12 @@ class HandwrittenNumbersDataset(Dataset):
         composite_image = self.concatenate_digits(digit_images)
         processed_image = self.process_image(composite_image)
 
-        # Convert image to tensor
         image_tensor = transforms.ToTensor()(processed_image)
-
-        # Prepare the label
-        label = number_str  # Now label is a string
+        label = number_str
 
         return image_tensor, label
 
     def augment_digit(self, image):
-        # Data augmentation transformations
         transform_list = []
 
         # Random rotation
@@ -152,7 +143,7 @@ class HandwrittenNumbersDataset(Dataset):
         total_width = sum(img.size[0] for img in digit_images) + sum(spacings)
         canvas_height = max_digit_height + 10  # Extra space for vertical shifts
 
-        new_image = Image.new('L', (total_width, canvas_height), color=0)  # Black background
+        new_image = Image.new('L', (total_width, canvas_height), color=0)
 
         x_offset = 0
         for i, im in enumerate(digit_images):
@@ -206,7 +197,6 @@ class HandwrittenNumbersDataset(Dataset):
         for i in range(data_length):
             self.data.append(self.generate_sample())
 
-        # Shuffle the data
         random.shuffle(self.data)
 
 
@@ -223,7 +213,7 @@ def test_dataset():
     print(f"Seed: {seed}")
 
     dataset = HandwrittenNumbersDataset(
-        custom_dataset_folder='/Users/sergejsorin/work/math/lib/mnist_improve/local_data/sorted',
+        custom_dataset_folder=get_custom_dataset_folder(),
         mnist_dataset=mnist_dataset,
         max_digits=5,
         length=length,
@@ -232,9 +222,7 @@ def test_dataset():
         pre_generate=True
     )
 
-
-    dataset.generate_sample()
-    
+    dataset.generate_sample()    
     import os
     import hashlib
     from PIL import Image
@@ -263,7 +251,7 @@ def test_dataset():
 
                 dup_filename = f"raw_duplicates/{image_hash}_{number}_dup{duplicate_count}.png"
                 image.save(dup_filename)
-                
+
                 orig_filename = f"raw_duplicates/{image_hash}_{number}_orig.png"
                 orig_image, _ = dataset[image_hashes[image_hash]]
                 orig_image = transforms.ToPILImage()(orig_image)
@@ -284,8 +272,6 @@ def test_dataset():
     # Run the check
     check_and_save_images(dataset, length)
 
-is_in_cloud = torch.cuda.is_available()
 if __name__ == "__main__":
-    if not is_in_cloud:
-        test_dataset()
+    test_dataset()
 

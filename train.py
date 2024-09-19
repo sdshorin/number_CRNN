@@ -18,7 +18,7 @@ import torch.nn.functional as F
 
 from numbers_generator import HandwrittenNumbersDataset
 from models import OriginalCRNN, OptimizedCRNN, SmallCRNN
-
+from config import get_custom_dataset_folder
 from tokenizer import Tokenizer, CTC_BLANK
 
 # Вспомогательные функции
@@ -91,7 +91,7 @@ def train_model(model, tokenizer):
     mnist_test = MNIST(root='./data', train=False, download=True)
 
 
-    custom_dataset_folder = '/Users/sergejsorin/work/math/lib/mnist_improve/local_data/sorted'
+    custom_dataset_folder = get_custom_dataset_folder()
     if not os.path.exists(custom_dataset_folder):
         custom_dataset_folder = "/home/user/sorted"
     
@@ -150,15 +150,19 @@ def train_model(model, tokenizer):
 is_in_cloud = torch.cuda.is_available()
 if __name__ == "__main__":
 
-    if not is_in_cloud:
+    # model = OriginalCRNN
+    model = OptimizedCRNN
+    # model = SmallCRNN
+
+    if torch.backends.mps.is_available():
         if os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK") != "1":
             raise Exception("Please run 'export PYTORCH_ENABLE_MPS_FALLBACK=1' before running this script")
 
-        alphabet = "0123456789"
-        tokenizer = Tokenizer(alphabet)
+    alphabet = "0123456789"
+    tokenizer = Tokenizer(alphabet)
 
-        model = OptimizedCRNN(imgH=32, nc=1, nclass=len(tokenizer.char_map), nh=256, n_rnn=2, leakyRelu=False)
-        print(f"Train {model.__class__.__name__}")
-        trained_model = train_model(model, tokenizer)
-        os.makedirs('models', exist_ok=True)
-        torch.save(trained_model.state_dict(), f'models/crnn_{model.__class__.__name__}.pth')
+    model = OptimizedCRNN(imgH=32, nc=1, nclass=len(tokenizer.char_map), nh=256, n_rnn=2, leakyRelu=False)
+    print(f"Train {model.__class__.__name__}")
+    trained_model = train_model(model, tokenizer)
+    os.makedirs('models', exist_ok=True)
+    torch.save(trained_model.state_dict(), f'models/crnn_{model.__class__.__name__}.pth')
