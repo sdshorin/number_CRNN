@@ -11,4 +11,5 @@ scripts.sh
 
 article_utils/__pycache__/*
 images/*
+config_secret.py
 
