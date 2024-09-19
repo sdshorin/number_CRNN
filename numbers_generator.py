@@ -10,7 +10,7 @@ import time
 import matplotlib.pyplot as plt
 
 class HandwrittenNumbersDataset(Dataset):
-    digits_per_class = 5000
+    digits_per_class = 1000
 
     def __init__(self, custom_dataset_folder, mnist_dataset, max_digits=5, length=100_000, include_leading_zeros=False, seed=None, pre_generate=False, num_threads=1):
         self.custom_dataset_folder = custom_dataset_folder
@@ -215,37 +215,26 @@ from torchvision.datasets import MNIST
 
 
 def test_dataset():
-    # Load MNIST dataset
     mnist_dataset = MNIST(root='./data', train=True, download=True)
 
     length=100_000
     seed = random.randint(0, 9999999)
     # seed = 2122224
     print(f"Seed: {seed}")
-    # Create the custom dataset
+
     dataset = HandwrittenNumbersDataset(
         custom_dataset_folder='/Users/sergejsorin/work/math/lib/mnist_improve/local_data/sorted',
         mnist_dataset=mnist_dataset,
         max_digits=5,
         length=length,
         include_leading_zeros=True,
-        seed=seed,  # For reproducibility
-        pre_generate=True  # Set to True to pre-generate data
+        seed=seed,
+        pre_generate=True
     )
 
-    # Visualize a sample for debugging
-    # dataset.visualize_sample()
 
     dataset.generate_sample()
-    # # Measure dataset generation speed
-    # start_time = time.time()
-    # for _ in range(100):
-    #     dataset.generate_sample()
-    # end_time = time.time()
-    # print(f"Time to generate 100 samples: {end_time - start_time:.2f} seconds")
-
-    # # Use DataLoader for batching
-    # data_loader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=4)
+    
     import os
     import hashlib
     from PIL import Image
@@ -271,10 +260,10 @@ def test_dataset():
             
             if image_hash in image_hashes:
                 duplicate_count += 1
-                # Save duplicate
+
                 dup_filename = f"raw_duplicates/{image_hash}_{number}_dup{duplicate_count}.png"
                 image.save(dup_filename)
-                # Save original for comparison
+                
                 orig_filename = f"raw_duplicates/{image_hash}_{number}_orig.png"
                 orig_image, _ = dataset[image_hashes[image_hash]]
                 orig_image = transforms.ToPILImage()(orig_image)
