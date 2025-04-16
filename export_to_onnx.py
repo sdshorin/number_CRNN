@@ -33,8 +33,9 @@ def quantize_onnx_model(input_path, output_path):
     print(f"Quantized model verified successfully for {output_path}")
 
 def process_model(model_class, model_name, input_shape=(1, 1, 32, 128)):
-
-    model = model_class(imgH=32, nc=1, nclass=12, nh=256, n_rnn=2, leakyRelu=False)
+    # nclass = 12 for digits 0-9 + blank + OOV
+    # nclass = 17 for digits 0-9 + special symbols (+-<>=) + blank + OOV
+    model = model_class(imgH=32, nc=1, nclass=17, nh=256, leakyRelu=False)
     model_path = f'./models/{model_name}.pth'
     
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
@@ -50,9 +51,9 @@ def process_model(model_class, model_name, input_shape=(1, 1, 32, 128)):
 
 
 models_info = [
-    (OriginalCRNN, 'crnn_OriginalCRNN'),
+    # (OriginalCRNN, 'crnn_OriginalCRNN'),
     (OptimizedCRNN, 'crnn_OptimizedCRNN'),
-    (SmallCRNN, 'crnn_SmallCRNN')
+    # (SmallCRNN, 'crnn_SmallCRNN')
 ]
 if __name__ == '__main__':
     

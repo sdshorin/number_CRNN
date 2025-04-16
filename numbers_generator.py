@@ -13,7 +13,7 @@ from config import get_custom_dataset_folder
 class HandwrittenNumbersDataset(Dataset):
     digits_per_class = 1000
 
-    def __init__(self, custom_dataset_folder, mnist_dataset, max_digits=5, length=100_000, include_leading_zeros=False, seed=None, pre_generate=False, num_threads=1):
+    def __init__(self, custom_dataset_folder, mnist_dataset, max_digits=5, length=100_000, include_leading_zeros=False, with_symbols=True, seed=None, pre_generate=False, num_threads=1):
         self.custom_dataset_folder = custom_dataset_folder
         self.mnist_dataset = mnist_dataset
         self.max_digits = max_digits
@@ -23,7 +23,12 @@ class HandwrittenNumbersDataset(Dataset):
         self.num_threads = num_threads
         self.length = length
 
+        
+        assert(not with_symbols  or custom_dataset_folder)
+        self.with_symbols = with_symbols
+
         self.digit_images = self.load_digit_images()
+        
 
         if seed is not None:
             random.seed(seed)
@@ -38,10 +43,24 @@ class HandwrittenNumbersDataset(Dataset):
             print(f"Data generation time: {end_time - start_time:.2f} seconds")
 
     def load_digit_images(self):
-
+        # Define special symbols mapping
         digit_images = {str(i): [] for i in range(10)}
+        if self.with_symbols:
+            symbol_map = {
+                '10': '+',
+                '11': '-',
+                '12': '<',
+                '13': '>',
+                '14': '='
+            }
+
+            # Initialize digit_images and custom_counts with both digits and symbols
+            for sym_folder, sym_char in symbol_map.items():
+                digit_images[sym_char] = []
+        
         custom_counts = {}
 
+        # Load digits (0-9)
         for digit in range(10):
             folder_path = os.path.join(self.custom_dataset_folder, str(digit))
             if os.path.exists(folder_path):
@@ -58,8 +77,27 @@ class HandwrittenNumbersDataset(Dataset):
                 custom_counts[str(digit)] = len(images)
             else:
                 custom_counts[str(digit)] = 0
+        
+        if self.with_symbols:
+            # Load special symbols (+, -, <, >, =)
+            for sym_folder, sym_char in symbol_map.items():
+                folder_path = os.path.join(self.custom_dataset_folder, sym_folder)
+                if os.path.exists(folder_path):
+                    images = []
+                    for img_file in os.listdir(folder_path):
+                        if img_file.endswith('.png'):
+                            img_path = os.path.join(folder_path, img_file)
+                            image = Image.open(img_path).convert('L') 
+                            if np.mean(image) > 127:
+                                image = ImageOps.invert(image)
+                            images.append(image)
+                    print(f"use {folder_path}, load {len(images)} images for symbol '{sym_char}'")
+                    digit_images[sym_char].extend(images)
+                    custom_counts[sym_char] = len(images)
+                else:
+                    custom_counts[sym_char] = 0
 
-        # Limit MNIST usage to complement up to 1000 digits per class
+        # Limit MNIST usage to complement up to 1000 digits per class (only for digits 0-9)
         mnist_digit_counts = {str(i): 0 for i in range(10)}
         mnist_digit_images = {str(i): [] for i in range(10)}
         for img, label in self.mnist_dataset:
@@ -72,9 +110,10 @@ class HandwrittenNumbersDataset(Dataset):
             if all(count >= self.digits_per_class - custom_counts[str(i)] for i, count in mnist_digit_counts.items()):
                 break
 
-        # Combine custom and MNIST images
-        for digit in digit_images.keys():
-            digit_images[digit].extend(mnist_digit_images[digit])
+        # Combine custom and MNIST images (only for digits 0-9)
+        for digit in range(10):
+            digit_str = str(digit)
+            digit_images[digit_str].extend(mnist_digit_images[digit_str])
 
         return digit_images
 
@@ -88,31 +127,56 @@ class HandwrittenNumbersDataset(Dataset):
             return self.generate_sample()
 
     def generate_sample(self):
-        num_digits = random.randint(1, self.max_digits)
-        if self.include_leading_zeros and random.random() < 0.1:
-            # 10% chance to include leading zeros
-            number_str = ''.join([str(random.randint(0, 9)) for _ in range(num_digits)])
-            number_str = number_str.zfill(self.max_digits)
+        # 20% chance to generate a special symbol instead of a number
+        if self.with_symbols and random.random() < 0.2:
+            # Generate one special symbol
+            symbol_choices = ['+', '-', '<', '>', '=']
+            symbol = random.choice(symbol_choices)
+            
+            # Get the symbol image
+            symbol_image = random.choice(self.digit_images[symbol])
+            symbol_image = self.augment_digit(symbol_image, [1.1, 1.35])
+            
+            # Process a single symbol
+            new_image = Image.new('L', (symbol_image.size[0] + 10, symbol_image.size[1] + 10), color=0)
+            y_offset = 5
+            x_offset = 5
+            temp_image = Image.new('L', new_image.size, color=0)
+            temp_image.paste(symbol_image, (x_offset, y_offset))
+            new_image = ImageChops.lighter(new_image, temp_image)
+            
+            # Process the image
+            processed_image = self.process_image(new_image)
+            image_tensor = transforms.ToTensor()(processed_image)
+            
+            return image_tensor, symbol
         else:
-            number = random.randint(0, 10**num_digits - 1)
-            number_str = str(number).zfill(num_digits)
+            # Generate a number (similar to original code)
+            num_digits = random.randint(1, self.max_digits)
+            if self.include_leading_zeros and random.random() < 0.1:
+                # 10% chance to include leading zeros
+                number_str = ''.join([str(random.randint(0, 9)) for _ in range(num_digits)])
+                number_str = number_str.zfill(self.max_digits)
+            else:
+                number = random.randint(0, 10**num_digits - 1)
+                number_str = str(number).zfill(num_digits)
 
-        # Build the image by concatenating digit images with random spacing and vertical position
-        digit_images = []
-        for digit_char in number_str:
-            digit_image = random.choice(self.digit_images[digit_char])
-            digit_image = self.augment_digit(digit_image)
-            digit_images.append(digit_image)
+            # Build the image by concatenating digit images with random spacing and vertical position
+            digit_images = []
+            for digit_char in number_str:
+                digit_image = random.choice(self.digit_images[digit_char])
+                digit_image = self.augment_digit(digit_image)
+                digit_images.append(digit_image)
 
-        composite_image = self.concatenate_digits(digit_images)
-        processed_image = self.process_image(composite_image)
+            composite_image = self.concatenate_digits(digit_images)
+            processed_image = self.process_image(composite_image)
 
-        image_tensor = transforms.ToTensor()(processed_image)
-        label = number_str
+            image_tensor = transforms.ToTensor()(processed_image)
+            label = number_str
 
-        return image_tensor, label
+            return image_tensor, label
 
-    def augment_digit(self, image):
+    def augment_digit(self, image, custom_scale = None):
         transform_list = []
 
         # Random rotation
@@ -120,8 +184,12 @@ class HandwrittenNumbersDataset(Dataset):
         image = image.rotate(rotation_degree, fillcolor=0)
 
         # Random zoom
-        scale_factor = random.uniform(0.9, 1.1)
-        new_size = (int(image.size[0]*scale_factor), int(image.size[1]*scale_factor))
+        scale_factor_x = random.uniform(0.9, 1.2)
+        scale_factor_y = random.uniform(0.9, 1.2)
+        if custom_scale:
+            scale_factor_x = random.uniform(custom_scale[0], custom_scale[1])
+            scale_factor_y = random.uniform(custom_scale[0], custom_scale[1])
+        new_size = (int(image.size[0]*scale_factor_x), int(image.size[1]*scale_factor_y))
         image = image.resize(new_size, Image.LANCZOS)
 
         # Random shift
@@ -137,7 +205,23 @@ class HandwrittenNumbersDataset(Dataset):
         # Random vertical shifts and spacing
         max_digit_height = max(img.size[1] for img in digit_images)
         vertical_shifts = [random.randint(-5, 5) for _ in digit_images]
-        spacings = [random.randint(-12, 10) for _ in range(len(digit_images)-1)]
+
+
+        # First, determine a base spacing for this number (typically smaller than before)
+        # Base spacing is now negative to make digits closer by default
+        base_spacing = random.randint(-15, -5)
+        
+        # Generate spacing variations around this base
+        # Smaller variation range to keep digits consistently close
+        variation = random.randint(1, 7) 
+        spacings = [base_spacing + random.randint(-variation, variation) for _ in range(len(digit_images)-1)]
+        
+        # Ensure minimum spacing to prevent complete overlap
+        # Still allowing overlap but preventing digits from being placed at the exact same position
+        min_spacing = -12  # Allow more overlap than before
+        spacings = [max(s, min_spacing) for s in spacings]
+
+        # spacings = [random.randint(-12, 10) for _ in range(len(digit_images)-1)]
 
         # Calculate total width
         total_width = sum(img.size[0] for img in digit_images) + sum(spacings)
@@ -244,7 +328,8 @@ def test_dataset():
             image = transforms.ToPILImage()(image_tensor)
             
             image_hash = image_to_hash(image)
-            number = ''.join(map(str, label.numpy()))
+            # number = ''.join(map(str, label.numpy()))
+            number = label if isinstance(label, str) else ''.join(map(str, label.numpy()))
             
             if image_hash in image_hashes:
                 duplicate_count += 1

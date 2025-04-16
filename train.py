@@ -16,8 +16,9 @@ from torchvision import transforms
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
-from numbers_generator import HandwrittenNumbersDataset
-from models import OriginalCRNN, OptimizedCRNN, SmallCRNN
+# from numbers_generator import HandwrittenNumbersDataset
+from new_generator import ImprovedHandwrittenNumbersDataset
+from models import OriginalCRNN, OptimizedCRNN, SmallCRNN, EnhancedCRNN, ImprovedCRNN
 from config import get_custom_dataset_folder
 from tokenizer import Tokenizer, CTC_BLANK
 
@@ -95,7 +96,7 @@ def train_model(model, tokenizer):
     if not os.path.exists(custom_dataset_folder):
         custom_dataset_folder = "/home/user/sorted"
     
-    train_dataset = HandwrittenNumbersDataset(
+    train_dataset = ImprovedHandwrittenNumbersDataset(
         custom_dataset_folder=custom_dataset_folder,
         mnist_dataset=mnist_train,
         max_digits=5,
@@ -106,8 +107,8 @@ def train_model(model, tokenizer):
         num_threads=1
     )
 
-    test_dataset = HandwrittenNumbersDataset(
-        custom_dataset_folder='',
+    test_dataset = ImprovedHandwrittenNumbersDataset(
+        custom_dataset_folder=custom_dataset_folder,
         mnist_dataset=mnist_test,
         max_digits=5,
         length=TEST_DATASET_SIZE,
@@ -150,18 +151,21 @@ def train_model(model, tokenizer):
 is_in_cloud = torch.cuda.is_available()
 if __name__ == "__main__":
 
-    # model = OriginalCRNN
-    model = OptimizedCRNN
-    # model = SmallCRNN
+    # model_class = OriginalCRNN
+    model_class = OptimizedCRNN
+    # model_class = EnhancedCRNN
+    # model_class = ImprovedCRNN
+    # model_class = SmallCRNN
 
     if torch.backends.mps.is_available():
         if os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK") != "1":
             raise Exception("Please run 'export PYTORCH_ENABLE_MPS_FALLBACK=1' before running this script")
 
-    alphabet = "0123456789"
+    alphabet = "0123456789+-<>="
+    # alphabet = "0123456789"
     tokenizer = Tokenizer(alphabet)
 
-    model = OptimizedCRNN(imgH=32, nc=1, nclass=len(tokenizer.char_map), nh=256, n_rnn=2, leakyRelu=False)
+    model = model_class(imgH=32, nc=1, nclass=len(tokenizer.char_map), nh=256, leakyRelu=False)
     print(f"Train {model.__class__.__name__}")
     trained_model = train_model(model, tokenizer)
     os.makedirs('models', exist_ok=True)

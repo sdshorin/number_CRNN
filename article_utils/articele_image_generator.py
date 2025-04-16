@@ -1,21 +1,30 @@
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import matplotlib.pyplot as plt
 from torchvision.datasets import MNIST
 from numbers_generator import HandwrittenNumbersDataset
+
+from new_generator import ImprovedHandwrittenNumbersDataset
 import random
 import torch
+
 
 from config import get_custom_dataset_folder
 
 def main():
-    seed = 46
-    random.seed(seed)
-    torch.manual_seed(seed)
+    # seed = 49
+    # random.seed(seed)
+    # torch.manual_seed(seed)
+    seed = random.randint(0, 9999999)
 
 
     mnist_dataset = MNIST(root='./data', train=True, download=True)
 
 
-    dataset = HandwrittenNumbersDataset(
+    # dataset = HandwrittenNumbersDataset(
+    dataset = ImprovedHandwrittenNumbersDataset(
         custom_dataset_folder=get_custom_dataset_folder(),
         mnist_dataset=mnist_dataset,
         max_digits=5,
