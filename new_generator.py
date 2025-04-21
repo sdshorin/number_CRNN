@@ -283,6 +283,7 @@ class ImprovedHandwrittenNumbersDataset(Dataset):
             spacing_mode = 'wide'
         else:
             spacing_mode = 'multi_overlap'
+    
         # spacing_mode = 'multi_overlap'
         
         # Only use multi_overlap mode if we have 3 or more digits
@@ -312,13 +313,18 @@ class ImprovedHandwrittenNumbersDataset(Dataset):
             variation = random.randint(3, 7)
         else:
             variation = random.randint(0, 3)
-            
-        spacings = [base_spacing + random.randint(-variation, variation) for _ in range(len(digit_images)-1)]
         
-        # # For multi_overlap mode with 3+ digits, create a specific overlap pattern
-        # if spacing_mode == 'multi_overlap' and len(digit_images) >= 3:
-        #     for i in range(len(spacings)):
-        #         spacings[i] = -3 if i % 2 == 0 else -2
+        spacings = [base_spacing + random.randint(-variation, variation) for _ in range(len(digit_images)-1)]
+
+        # Calculate digit widths and limit overlap between adjacent digits
+        digit_widths = [img.size[0] for img in digit_images]
+        for i in range(len(digit_images)-1):
+            # Calculate maximum allowed overlap based on 1/3 of the smaller width
+            current_width = digit_widths[i]
+            next_width = digit_widths[i+1]
+            max_overlap = min(current_width, next_width) // 3
+            spacings[i] = max(spacings[i], -max_overlap)
+            
         
         # Calculate boundaries for placement
         max_digit_height = max(img.size[1] for img in digit_images)
@@ -354,8 +360,15 @@ class ImprovedHandwrittenNumbersDataset(Dataset):
             # Find first and last non-empty rows
             top_row = np.where(non_zero_rows)[0][0]
             bottom_row = np.where(non_zero_rows)[0][-1]
+            
+            canvas_center = canvas_height // 2
+            max_trim_top = canvas_center - canvas_height // 3
+            max_trim_bottom = canvas_center + canvas_height // 3
+            
+            top_row = min(top_row, max_trim_top)
+            bottom_row = max(bottom_row, max_trim_bottom)
         
-        # Crop the canvas to remove empty rows
+        # Crop the canvas to remove empty rows, but not more than half of the pixels
         canvas = canvas.crop((0, top_row, canvas.width, bottom_row + 1))
         
         # Resize to fit viewport width while maintaining aspect ratio
@@ -537,8 +550,8 @@ class ImprovedHandwrittenNumbersDataset(Dataset):
 
         for i in range(data_length):
             self.data.append(self.generate_sample())
-            if i % 1000 == 0:
-                print(f"Generated {i}/{data_length} samples")
+            # if i % 1000 == 0:
+            #     print(f"Generated {i}/{data_length} samples")
 
         random.shuffle(self.data)
 

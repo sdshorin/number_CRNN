@@ -135,6 +135,14 @@ def train_model(model, tokenizer):
     import time
     num_epochs = NUM_EPOCH
     for epoch in range(1, num_epochs + 1):
+        # Regenerate training data before each epoch
+        print(f"Regenerating training data for epoch {epoch}...")
+        regen_start = time.time()
+        train_dataset.data = []
+        train_dataset.generate_data_single_threaded()
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn_with_tokenizer)
+        regen_end = time.time()
+        
         train_start = time.time()
         train_loss = train(model, criterion, optimizer, train_loader, device, tokenizer)
         train_end = time.time()
@@ -143,7 +151,7 @@ def train_model(model, tokenizer):
         eval_end = time.time()
         estimated_end_time = train_start + (eval_end - train_start) * (num_epochs - epoch)
         human_readable_eta = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(estimated_end_time))
-        print(f'Epoch {epoch}, Train Loss: {train_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}, Train Accuracy: {train_accuracy:.4f}, Train Time: {train_end - train_start:.2f}, Eval Time: {eval_end - train_end:.2f}, ETA: {human_readable_eta}')
+        print(f'Epoch {epoch}, Train Loss: {train_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}, Train Accuracy: {train_accuracy:.4f}, Regen Time: {regen_end - regen_start:.2f}, Train Time: {train_end - train_start:.2f}, Eval Time: {eval_end - train_end:.2f}, ETA: {human_readable_eta}')
 
     return model
 
